@@ -1,6 +1,6 @@
 'use client'
 
-import { signup } from '@/app/auth/actions'
+import { signup, type AuthState } from '@/app/auth/actions'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -9,7 +9,7 @@ import { useActionState } from 'react' // React 19 / Next 15+
 import { Loader2 } from 'lucide-react'
 
 // Initial state for the form
-const initialState = {
+const initialState: AuthState = {
     error: '',
     success: false,
     message: ''

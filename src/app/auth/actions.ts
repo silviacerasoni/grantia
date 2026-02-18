@@ -5,8 +5,15 @@ import { redirect } from 'next/navigation'
 
 import { createClient } from '@/utils/supabase/server'
 
+// Auth State Type
+export type AuthState = {
+    error?: string
+    success?: boolean
+    message?: string
+}
+
 // Login Action
-export async function login(prevState: any, formData: FormData) {
+export async function login(prevState: AuthState, formData: FormData): Promise<AuthState> {
     const supabase = await createClient()
 
     const email = formData.get('email') as string
@@ -23,10 +30,12 @@ export async function login(prevState: any, formData: FormData) {
 
     revalidatePath('/', 'layout')
     redirect('/')
+    // Redirect throws, so we technically don't reach here, but for TS completeness:
+    return {}
 }
 
 // Signup Action
-export async function signup(prevState: any, formData: FormData) {
+export async function signup(prevState: AuthState, formData: FormData): Promise<AuthState> {
     const supabase = await createClient()
 
     const email = formData.get('email') as string
@@ -50,12 +59,12 @@ export async function signup(prevState: any, formData: FormData) {
 
     if (authError) {
         console.error("Signup Auth Error:", authError.message);
-        return { error: authError.message }
+        return { error: authError.message, success: false, message: '' }
     }
 
     if (!authData.user) {
         console.error("Signup failed: No user returned");
-        return { error: "Signup failed: No user returned." }
+        return { error: "Signup failed: No user returned.", success: false, message: '' }
     }
 
     console.log("Signup successful, user:", authData.user.id);
@@ -74,7 +83,8 @@ export async function signup(prevState: any, formData: FormData) {
         // Email confirmation required
         return {
             success: true,
-            message: "Please check your email to confirm your account."
+            message: "Please check your email to confirm your account.",
+            error: ''
         }
     }
 }
