@@ -1,175 +1,282 @@
 "use client";
 
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { format, addDays, startOfWeek, subWeeks, addWeeks, isSameDay } from 'date-fns'; // Using standard imports
-import { ChevronLeft, ChevronRight, AlertTriangle, Plus } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { upsertAllocations, AllocationInput } from "@/app/actions/planning";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import { ChevronLeft, ChevronRight, Save, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { startOfWeek, addWeeks, format, isSameDay, parseISO } from "date-fns";
 
-// Mock Data Types
-type Resource = {
-    id: string;
-    name: string;
-    role: string;
-    avatar?: string;
-    weeklyCapacity: number; // e.g., 40 hours
-};
-
-type Allocation = {
-    id: string;
-    resourceId: string;
+type PlannerProps = {
     projectId: string;
-    date: Date;
-    hours: number;
+    activities: any[];
+    team: any[];
+    allocations: any[]; // Existing allocations from DB
 };
 
-// Mock Data
-const RESOURCES: Resource[] = [
-    { id: '1', name: 'Dr. Elena Rossi', role: 'Senior Researcher', weeklyCapacity: 40, avatar: '' },
-    { id: '2', name: 'Marco Bianchi', role: 'Junior Analyst', weeklyCapacity: 40, avatar: '' },
-    { id: '3', name: 'Sophie Dubois', role: 'Project Manager', weeklyCapacity: 35, avatar: '' },
-];
-
-const ALLOCATIONS: Allocation[] = [
-    { id: 'a1', resourceId: '1', projectId: 'p1', date: new Date(), hours: 8 },
-    { id: 'a2', resourceId: '1', projectId: 'p1', date: addDays(new Date(), 1), hours: 8 },
-    { id: 'a3', resourceId: '2', projectId: 'p1', date: new Date(), hours: 4 },
-];
-
-export function ResourcePlanner() {
+export function ResourcePlanner({ projectId, activities, team, allocations }: PlannerProps) {
+    const router = useRouter();
     const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
-    const [allocations, setAllocations] = useState<Allocation[]>(ALLOCATIONS);
+    const [localAllocations, setLocalAllocations] = useState<Record<string, number>>({});
+    // Key: "userId-activityId-dateString", Value: hours
 
-    const weekDays = Array.from({ length: 5 }).map((_, i) => addDays(currentWeekStart, i));
+    // Separate allocations into Current Project vs Other Projects
+    const { projectAllocationsMap, otherProjectLoad } = useMemo(() => {
+        const currentMap: Record<string, number> = {};
+        const otherLoad: Record<string, number> = {}; // Key: "userId-dateString"
 
-    const handlePrevWeek = () => setCurrentWeekStart(subWeeks(currentWeekStart, 1));
-    const handleNextWeek = () => setCurrentWeekStart(addWeeks(currentWeekStart, 1));
+        allocations.forEach(a => {
+            // Guard against stale data or missing joins
+            if (!a.activity_id) return;
 
-    const getAllocation = (resourceId: string, date: Date) => {
-        return allocations.find(a =>
-            a.resourceId === resourceId && isSameDay(new Date(a.date), date)
-        );
+            if (a.project_id === projectId) {
+                const key = `${a.user_id}::${a.activity_id}::${a.week_start_date}`;
+                currentMap[key] = Number(a.hours);
+            } else {
+                const dateKey = `${a.user_id}::${a.week_start_date}`; // Activity doesn't matter for total
+                otherLoad[dateKey] = (otherLoad[dateKey] || 0) + Number(a.hours);
+            }
+        });
+        return { projectAllocationsMap: currentMap, otherProjectLoad: otherLoad };
+    }, [allocations, projectId]);
+
+    // Parse existing DB allocations into local map on init
+    // Only load CURRENT project allocations into the editable state
+    useMemo(() => {
+        setLocalAllocations(prev => ({ ...prev, ...projectAllocationsMap }));
+    }, [projectAllocationsMap]);
+
+    // View State
+    const [selectedActivityId, setSelectedActivityId] = useState<string>("all");
+
+    // Filter activities
+    const visibleActivities = selectedActivityId === "all" ? activities : activities.filter(a => a.id === selectedActivityId);
+
+    // Generate 4 weeks view
+    const weeks = Array.from({ length: 4 }).map((_, i) => addWeeks(currentWeekStart, i));
+
+    const handleValueChange = (userId: string, activityId: string, weekDate: Date, val: string) => {
+        // Allow empty string to clear the value
+        const hours = val === '' ? 0 : parseFloat(val);
+        const dateStr = format(weekDate, 'yyyy-MM-dd');
+        const key = `${userId}::${activityId}::${dateStr}`;
+
+        // If val is '', we can set it to 0 or undefined. 
+        // If we set to 0, it shows 0. If undefined/cleaned, it shows empty.
+        // Let's store the number.
+
+        setLocalAllocations(prev => ({
+            ...prev,
+            [key]: isNaN(hours) ? 0 : hours
+        }));
     };
 
-    const calculateTotalWeeklyHours = (resourceId: string) => {
-        return allocations
-            .filter(a => a.resourceId === resourceId && a.date >= currentWeekStart && a.date <= addDays(currentWeekStart, 6))
-            .reduce((sum, a) => sum + a.hours, 0);
-    };
+    const handleSave = async () => {
 
-    const handleAddAllocation = (resourceId: string, date: Date) => {
-        // Simple toggle logic for demo: Add 4 hours or remove
-        const existing = getAllocation(resourceId, date);
-        if (existing) {
-            setAllocations(prev => prev.filter(a => a.id !== existing.id));
+
+        // REWRITE key parsing safely
+        const safeUpdates: AllocationInput[] = [];
+        for (const key in localAllocations) {
+            // Key format: user_id::activity_id::dateStr
+            const parts = key.split('::');
+            if (parts.length === 3) {
+                const [uId, aId, date] = parts;
+
+                // Strict check: if aId is "undefined" or empty, skip.
+                if (aId === 'undefined' || !aId) continue;
+
+                safeUpdates.push({
+                    user_id: uId,
+                    activity_id: aId,
+                    week_start_date: date,
+                    hours: localAllocations[key]
+                });
+            }
+        }
+
+        if (safeUpdates.length === 0) return;
+
+        const result = await upsertAllocations(projectId, safeUpdates);
+        if (result.error) {
+            toast.error(`Failed to save plan: ${result.error}`);
         } else {
-            const newAllocation: Allocation = {
-                id: Math.random().toString(36).substr(2, 9),
-                resourceId,
-                projectId: 'p1',
-                date,
-                hours: 4
-            };
-            setAllocations(prev => [...prev, newAllocation]);
+            toast.success("Resource plan saved successfully");
+            router.refresh();
         }
     };
 
+    // Helper to get value
+    const getAllocatedHours = (userId: string, activityId: string, weekDate: Date) => {
+        const dateStr = format(weekDate, 'yyyy-MM-dd');
+        // Use "::" separator!
+        const key = `${userId}::${activityId}::${dateStr}`;
+        return localAllocations[key] || 0;
+    };
+
+    // Calculate Total Load per User per Week
+    // Calculate Total Load per User per Week
+    const getUserWeeklyStats = (userId: string, weekDate: Date) => {
+        const dateStr = format(weekDate, 'yyyy-MM-dd');
+        let currentProjectTotal = 0;
+
+        // Iterate known activities to prevent summing ghost/duplicate keys
+        activities.forEach(act => {
+            const key = `${userId}::${act.id}::${dateStr}`;
+            currentProjectTotal += (localAllocations[key] || 0);
+        });
+
+        // otherProjectLoad keys are "userId::dateStr"
+        const otherLoad = otherProjectLoad[`${userId}::${dateStr}`] || 0;
+        const total = currentProjectTotal + otherLoad;
+
+        return { currentProjectTotal, otherLoad, total };
+    };
+
     return (
-        <div className="space-y-4">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <Button variant="outline" size="icon" onClick={handlePrevWeek}><ChevronLeft className="h-4 w-4" /></Button>
-                    <span className="font-medium text-sm w-32 text-center">
-                        Week of {format(currentWeekStart, 'MMM d')}
-                    </span>
-                    <Button variant="outline" size="icon" onClick={handleNextWeek}><ChevronRight className="h-4 w-4" /></Button>
-                </div>
-                <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className="w-3 h-3 rounded bg-blue-100 border border-blue-200 block"></span> Normal
-                        <span className="w-3 h-3 rounded bg-red-100 border border-red-200 block"></span> Overload
+        <Card className="mt-6">
+            <CardHeader>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <CardTitle>Resource Planner</CardTitle>
+                        <CardDescription>Assign weekly hours to team members</CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" size="icon" onClick={() => setCurrentWeekStart(d => addWeeks(d, -1))}>
+                            <ChevronLeft className="w-4 h-4" />
+                        </Button>
+                        <span className="text-sm font-medium w-32 text-center">
+                            {format(currentWeekStart, "MMM d, yyyy")}
+                        </span>
+                        <Button variant="outline" size="icon" onClick={() => setCurrentWeekStart(d => addWeeks(d, 1))}>
+                            <ChevronRight className="w-4 h-4" />
+                        </Button>
+                        <Button onClick={handleSave} className="ml-4">
+                            <Save className="w-4 h-4 mr-2" /> Save Plan
+                        </Button>
                     </div>
                 </div>
-            </div>
-
-            <div className="border rounded-lg overflow-hidden bg-card">
-                {/* Header Row */}
-                <div className="grid grid-cols-[250px_1fr] divide-x border-b">
-                    <div className="p-4 font-semibold text-sm bg-muted/50">Resource</div>
-                    <div className="grid grid-cols-5 divide-x">
-                        {weekDays.map(day => (
-                            <div key={day.toString()} className="p-4 text-center text-sm font-medium bg-muted/50">
-                                {format(day, 'EEE d')}
-                            </div>
-                        ))}
-                    </div>
+            </CardHeader>
+            <CardContent>
+                {/* Filter */}
+                <div className="mb-4 w-[200px]">
+                    <Select value={selectedActivityId} onValueChange={setSelectedActivityId}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Filter Activity" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Activities</SelectItem>
+                            {activities.map(a => (
+                                <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
 
-                {/* Resource Rows */}
-                <div className="divide-y relative">
-                    {RESOURCES.map(resource => {
-                        const totalHours = calculateTotalWeeklyHours(resource.id);
-                        const isOverloaded = totalHours > resource.weeklyCapacity;
-
-                        return (
-                            <div key={resource.id} className="grid grid-cols-[250px_1fr] divide-x group hover:bg-muted/20 transition-colors">
-                                {/* Resource Info Col */}
-                                <div className="p-4 flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <Avatar className="h-8 w-8">
-                                            <AvatarImage src={resource.avatar} />
-                                            <AvatarFallback>{resource.name.charAt(0)}</AvatarFallback>
-                                        </Avatar>
-                                        <div>
-                                            <p className="text-sm font-medium leading-none">{resource.name}</p>
-                                            <p className="text-xs text-muted-foreground mt-1">{resource.role}</p>
+                <div className="border rounded-md overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead className="bg-muted/50 border-b">
+                            <tr>
+                                <th className="p-2 text-left w-[200px]">Resource / Activity</th>
+                                {weeks.map(week => (
+                                    <th key={week.toISOString()} className="p-2 text-center w-[100px] border-l">
+                                        Week {format(week, 'w')}
+                                        <div className="text-xs text-muted-foreground font-normal">
+                                            {format(week, 'dd MMM')}
                                         </div>
-                                    </div>
-
-                                    {isOverloaded && (
-                                        <div className="text-destructive flex items-center" title={`Over capacity: ${totalHours}/${resource.weeklyCapacity}h`}>
-                                            <AlertTriangle className="h-4 w-4" />
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Days Grid */}
-                                <div className="grid grid-cols-5 divide-x">
-                                    {weekDays.map(day => {
-                                        const allocation = getAllocation(resource.id, day);
-                                        // D&D Placeholder: In a real drag-drop, this cell would be a droppable area
-                                        // For now, click to allocate
-                                        return (
-                                            <div
-                                                key={day.toString()}
-                                                className="relative p-2 h-16 transition-colors hover:bg-muted/40 cursor-pointer"
-                                                onClick={() => handleAddAllocation(resource.id, day)}
-                                            >
-                                                {allocation && (
-                                                    <div className={cn(
-                                                        "h-full rounded-md p-2 text-xs font-medium border flex flex-col justify-center items-center shadow-sm",
-                                                        isOverloaded ? "bg-destructive/10 border-destructive/20 text-destructive" : "bg-primary/10 border-primary/20 text-primary"
-                                                    )}>
-                                                        <span>{allocation.hours}h</span>
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {team.map(user => (
+                                <>
+                                    <tr key={user.id} className="bg-muted/20 border-b">
+                                        <td className="p-2 font-semibold">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs">
+                                                    {user.full_name[0]}
+                                                </div>
+                                                <div>
+                                                    <div>{user.full_name}</div>
+                                                    <div className="text-[10px] text-muted-foreground font-normal">
+                                                        Capacity: {user.weekly_capacity}h
                                                     </div>
-                                                )}
-                                                {!allocation && (
-                                                    <div className="h-full w-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:!opacity-100">
-                                                        <Plus className="h-4 w-4 text-muted-foreground/50" />
-                                                    </div>
-                                                )}
+                                                </div>
                                             </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        );
-                    })}
+                                        </td>
+                                        {weeks.map(week => {
+                                            const { currentProjectTotal, otherLoad, total } = getUserWeeklyStats(user.id, week);
+                                            const capacity = user.weekly_capacity || 40;
+                                            const remaining = capacity - total;
+                                            const isOver = total > capacity;
+
+                                            return (
+                                                <td key={week.toISOString()} className={cn("p-2 text-center border-l align-top", isOver && "bg-destructive/5")}>
+                                                    <div className="flex flex-col gap-1 items-center">
+                                                        {/* Total Load */}
+                                                        <span className={cn("text-xs font-bold", isOver ? "text-destructive" : "text-foreground")}>
+                                                            {total}h Total
+                                                            {isOver && <AlertTriangle className="w-3 h-3 inline ml-1" />}
+                                                        </span>
+
+                                                        {/* Breakdown if pertinent */}
+                                                        {otherLoad > 0 && (
+                                                            <span className="text-[10px] text-muted-foreground">
+                                                                ({otherLoad}h other)
+                                                            </span>
+                                                        )}
+
+                                                        {/* Remaining */}
+                                                        <span className={cn("text-[10px] font-medium border rounded px-1.5 py-0.5",
+                                                            remaining < 0 ? "bg-destructive/10 text-destructive border-destructive/20" : "bg-background border-muted"
+                                                        )}>
+                                                            {remaining >= 0 ? `${remaining}h avail` : `${Math.abs(remaining)}h over`}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                    {visibleActivities.map(act => (
+                                        <tr key={`${user.id}-${act.id}`} className="hover:bg-muted/10 border-b last:border-0">
+                                            <td className="p-2 pl-8 text-muted-foreground text-xs">
+                                                └ {act.name}
+                                            </td>
+                                            {weeks.map(week => {
+                                                const dateStr = format(week, 'yyyy-MM-dd');
+                                                // key MUST match the one used in handleValueChange and initial load
+                                                const key = `${user.id}::${act.id}::${dateStr}`;
+
+                                                return (
+                                                    <td key={`${user.id}-${week.toISOString()}`} className="p-1 border-l text-center">
+                                                        <Input
+                                                            className="h-7 w-16 mx-auto text-center text-xs"
+                                                            type="number"
+                                                            min={0}
+                                                            // If key is missing, it's undefined. || '' makes it empty.
+                                                            // If it is 0, || '' makes it empty.
+                                                            // Maybe user wants to see 0? 
+                                                            // But usually empty is cleaner.
+                                                            // Let's try explicitly handling undefined.
+                                                            value={localAllocations[key] !== undefined ? localAllocations[key] : ''}
+                                                            onChange={(e) => handleValueChange(user.id, act.id, week, e.target.value)}
+                                                        />
+                                                    </td>
+                                                )
+                                            })}
+                                        </tr>
+                                    ))}
+                                </>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
-            </div>
-        </div>
+            </CardContent>
+        </Card>
     );
 }

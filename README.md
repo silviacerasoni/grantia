@@ -1,38 +1,8 @@
 # Grantia - EU Project Management Platform
 
-Grantia is a SaaS platform for managing European Projects (Horizon Europe), designed for Project Managers, Researchers, and Accounting Departments.
+Grantia is a SaaS platform for managing European Projects (Horizon Europe).
 
-## Tech Stack
-
-- **Framework**: Next.js 14+ (App Router)
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS + Shadcn/UI
-- **Icons**: Lucide React
-- **Charts**: Recharts
-- **Backend**: Supabase (Auth, Database, Storage)
-- **Deployment**: Vercel
-
-## Project Structure
-
-```
-src/
-├── app/                  # Next.js App Router pages
-│   ├── (dashboard)/      # Protected dashboard routes
-│   │   ├── layout.tsx    # Dashboard layout with Sidebar
-│   │   └── page.tsx      # Main Dashboard view
-│   ├── layout.tsx        # Root layout
-│   └── globals.css       # Global styles & Tailwind config
-├── components/
-│   ├── ui/               # Shadcn UI primitives (Button, Card, etc.)
-│   ├── features/         # Domain-specific components (Charts, Widgets)
-│   └── layout/           # Layout components (Sidebar, Navbar)
-├── lib/                  # Utilities & Libraries
-│   ├── supabase.ts       # Supabase client configuration
-│   └── utils.ts          # Helper functions (cn, etc.)
-└── types/                # TypeScript definitions
-```
-
-## Getting Started
+## 🚀 Quick Start (Local Preview)
 
 1. **Install dependencies**:
    ```bash
@@ -40,7 +10,7 @@ src/
    ```
 
 2. **Environment Setup**:
-   Copy `.env.example` to `.env.local` and add your Supabase credentials:
+   Create a `.env.local` file in the root directory:
    ```env
    NEXT_PUBLIC_SUPABASE_URL=your-project-url
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
@@ -50,15 +20,30 @@ src/
    ```bash
    npm run dev
    ```
+   Open [http://localhost:3000](http://localhost:3000) to view the application.
 
-4. **Build for Production**:
-   ```bash
-   npm run build
-   ```
+## 📦 Deployment & Database
 
-## Key Features
+### 1. Push to GitHub
+If you haven't already, create a new repository on GitHub and run:
 
-- **Resource Planning**: Manage team allocation and timesheets.
-- **Finance & Costs**: Track expenses and budget burn rates.
-- **Reporting**: Generate compliant reports for EU bodies.
-- **Compliance**: Monitor project health and audit readiness.
+```bash
+git remote add origin https://github.com/YOUR_USERNAME/grantia.git
+git branch -M main
+git push -u origin main
+```
+
+### 2. Initialize Database (Supabase)
+This project uses Supabase for the backend.
+
+1. Go to your [Supabase Dashboard](https://supabase.com/dashboard).
+2. Create a new project.
+3. Open the **SQL Editor**.
+4. **Copy & Run** the content of [`supabase/schema.sql`](./supabase/schema.sql) to create tables.
+5. **Copy & Run** the content of [`supabase/seed.sql`](./supabase/seed.sql) to populate sample data.
+
+## Project Structure
+
+- `src/app`: Next.js App Router
+- `src/components`: Shadcn UI & Features
+- `supabase/`: SQL Schemas & Seeds

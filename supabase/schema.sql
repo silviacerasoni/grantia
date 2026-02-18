@@ -66,6 +66,8 @@ CREATE TABLE project_resources (
 );
 
 -- 7. Expenses Table
+CREATE TYPE payment_status AS ENUM ('pending_payment', 'paid', 'reconciled');
+
 CREATE TABLE expenses (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     project_id UUID REFERENCES projects(id) NOT NULL,
@@ -73,9 +75,20 @@ CREATE TABLE expenses (
     user_id UUID REFERENCES profiles(id) NOT NULL, -- Who incurred the expense
     category TEXT NOT NULL, -- e.g., "Travel", "Equipment"
     description TEXT,
-    amount NUMERIC(10, 2) NOT NULL,
+    amount NUMERIC(10, 2) NOT NULL, -- Gross Amount
     currency TEXT DEFAULT 'EUR',
     date DATE NOT NULL,
+    
+    -- Accounting Fields
+    vat_rate NUMERIC(5, 2) DEFAULT 0.00,
+    -- VAT Amount calculated from Gross: Amount * Rate / (100 + Rate)
+    vat_amount NUMERIC(10, 2) GENERATED ALWAYS AS (amount * vat_rate / (100 + vat_rate)) STORED,
+    -- Net Amount: Amount - VAT Amount
+    net_amount NUMERIC(10, 2) GENERATED ALWAYS AS (amount * 100 / (100 + vat_rate)) STORED,
+    
+    payment_status payment_status DEFAULT 'pending_payment',
+    payment_date DATE,
+    
     receipt_url TEXT, -- Link to Storage
     status request_status DEFAULT 'pending',
     rejection_reason TEXT,
