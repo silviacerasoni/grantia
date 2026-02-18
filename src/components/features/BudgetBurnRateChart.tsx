@@ -45,35 +45,35 @@ export function BudgetBurnRateChart() {
                         >
                             <defs>
                                 <linearGradient id="colorBudget" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                                    <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3} />
+                                    <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
                                 </linearGradient>
                             </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted-foreground)/0.2)" />
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--muted-foreground)" strokeOpacity={0.2} />
                             <XAxis
                                 dataKey="name"
                                 axisLine={false}
                                 tickLine={false}
-                                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                                tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
                                 dy={10}
                             />
                             <YAxis
                                 axisLine={false}
                                 tickLine={false}
-                                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                                tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
                                 tickFormatter={(value) => `€${value / 1000}k`}
                             />
                             <Tooltip
                                 contentStyle={{
-                                    backgroundColor: 'hsl(var(--popover))',
+                                    backgroundColor: 'var(--popover)',
                                     borderRadius: 'var(--radius)',
-                                    border: '1px solid hsl(var(--border))',
+                                    border: '1px solid var(--border)',
                                     boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                                    color: 'hsl(var(--popover-foreground))'
+                                    color: 'var(--popover-foreground)'
                                 }}
                                 formatter={(value: number | string | undefined) => [`€${Number(value || 0).toLocaleString()}`, 'Budget Used']}
                             />
-                            <Area type="monotone" dataKey="budget" stroke="hsl(var(--primary))" strokeWidth={3} fillOpacity={1} fill="url(#colorBudget)" />
+                            <Area type="monotone" dataKey="budget" stroke="var(--primary)" strokeWidth={3} fillOpacity={1} fill="url(#colorBudget)" />
                         </AreaChart>
                     </ResponsiveContainer>
                 </div>

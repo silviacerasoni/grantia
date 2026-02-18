@@ -88,8 +88,8 @@ export default async function ProjectPage({ params }: Props) {
                     </div>
                 </div>
                 <div className="flex gap-2">
-                    <EditProjectDialog project={project} users={users || []} />
                     <DeleteProjectButton projectId={project.id} />
+                    <EditProjectDialog project={project} users={users || []} />
                 </div>
             </div>
 
@@ -112,7 +112,7 @@ export default async function ProjectPage({ params }: Props) {
                                 </p>
 
                                 <div className="flex flex-col gap-6 mt-2">
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-4">
                                         <div className="bg-primary/10 p-2 rounded-lg">
                                             <Calendar className="h-5 w-5 text-primary" />
                                         </div>
@@ -123,7 +123,7 @@ export default async function ProjectPage({ params }: Props) {
                                             </p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-4">
                                         <div className="bg-primary/10 p-2 rounded-lg">
                                             <CreditCard className="h-5 w-5 text-primary" />
                                         </div>
@@ -134,7 +134,7 @@ export default async function ProjectPage({ params }: Props) {
                                             </p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-4">
                                         <div className="bg-primary/10 p-2 rounded-lg">
                                             <User className="h-5 w-5 text-primary" />
                                         </div>

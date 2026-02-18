@@ -71,7 +71,7 @@ export function CreateProjectWizard() {
             <div className="flex justify-between mb-8 relative">
                 <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-muted -z-10 -translate-y-1/2" />
                 {STEPS.map((s) => (
-                    <div key={s.number} className="flex flex-col items-center bg-background px-2">
+                    <div key={s.number} className="flex flex-col items-center px-2 z-10 bg-background/0">
                         <div className={cn(
                             "w-8 h-8 rounded-full flex items-center justify-center font-bold border-2 mb-2",
                             step >= s.number

@@ -36,8 +36,8 @@ export function Sidebar({ userProfile }: SidebarProps) {
         : 'U';
 
     return (
-        <aside className="w-64 bg-card border-r border-border flex flex-col h-full bg-white dark:bg-zinc-950">
-            <div className="p-6 border-b border-border">
+        <aside className="w-64 bg-sidebar border-r border-sidebar-border flex flex-col h-full text-sidebar-foreground">
+            <div className="p-6 border-b border-sidebar-border">
                 <div className="flex items-center gap-2 font-bold text-xl text-primary">
                     <Landmark className="w-8 h-8" />
                     <span>Grantia</span>

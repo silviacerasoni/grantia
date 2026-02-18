@@ -9,7 +9,7 @@ const data = [
     { name: 'Remaining', value: 2 },
 ];
 // Using CSS variables for colors if possible, or mapping them
-const COLORS = ['hsl(var(--primary))', 'hsl(var(--muted))'];
+const COLORS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)'];
 
 export function ComplianceScoreChart() {
     return (

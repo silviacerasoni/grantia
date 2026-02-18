@@ -24,7 +24,7 @@ export default async function ProjectsPage() {
     const projects = await getProjects();
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-8">
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
@@ -37,7 +37,7 @@ export default async function ProjectsPage() {
                 </Link>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
                 {projects.map((project: any) => (
                     <Link key={project.id} href={`/projects/${project.id}`}>
                         <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">

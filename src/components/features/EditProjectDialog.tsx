@@ -81,7 +81,7 @@ export function EditProjectDialog({ project, users }: { project: Project; users:
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="outline">
+                <Button variant="default">
                     <Pencil className="w-4 h-4 mr-2" />
                     Edit Project
                 </Button>
